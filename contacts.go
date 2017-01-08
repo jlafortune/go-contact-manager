@@ -1,10 +1,11 @@
-// contacts.go
-// Basic contact manager
+// Basic CLI contact manager, which stores data in a local file contacts.json
 package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 )
@@ -12,37 +13,52 @@ import (
 var contacts = []contact{}
 
 type contact struct {
-	firstName string
-	lastName  string
-	age       int
-	telephone string
+	FirstName string
+	LastName  string
+	Age       int
+	Telephone string
 }
 
 func main() {
+	loadContacts()
 	mainMenu()
 }
 
+func loadContacts() {
+	input, err := os.Open("contacts.json")
+	defer input.Close()
+	if err != nil {
+		fmt.Println("No previous contacts found. Will create a new save.")
+	} else {
+		jsonParser := json.NewDecoder(input)
+		if err = jsonParser.Decode(&contacts); err != nil {
+			fmt.Println(err.Error())
+		}
+	}
+}
+
 func mainMenu() {
-	fmt.Println("Welcome to Contact Manager. Select an option:")
-	fmt.Println("\t[1] Find a Contact")
-	fmt.Println("\t[2] Create a Contact")
-	fmt.Println("\t[q] Quit")
-	fmt.Print("Your choice: ")
+	for {
+		fmt.Println("Select an option:")
+		fmt.Println("\t[1] Find a Contact")
+		fmt.Println("\t[2] Create a Contact")
+		fmt.Println("\t[q] Quit")
+		fmt.Print("Your choice: ")
 
-	scanner := bufio.NewScanner(os.Stdin)
+		scanner := bufio.NewScanner(os.Stdin)
 
-	if scanner.Scan() {
-		input := scanner.Text()
-		switch {
-		case input == "1":
-			findContact()
-		case input == "2":
-			createContact()
-		case input == "q" || input == "Q":
-			os.Exit(0)
-		default:
-			fmt.Println("Unrecognized selection.")
-			mainMenu()
+		if scanner.Scan() {
+			input := scanner.Text()
+			switch {
+			case input == "1":
+				findContact()
+			case input == "2":
+				createContact()
+			case input == "q" || input == "Q":
+				os.Exit(0)
+			default:
+				fmt.Println("Unrecognized selection.")
+			}
 		}
 	}
 }
@@ -50,7 +66,8 @@ func mainMenu() {
 func findContact() {
 	for {
 		for i, c := range contacts {
-			fmt.Printf("\t[%d] %s %s\n", i, c.firstName, c.lastName)
+			fmt.Printf("\t[%d] %s %s, Age: %d, Phone: %s\n", i,
+				c.FirstName, c.LastName, c.Age, c.Telephone)
 		}
 		fmt.Println("\t[m] Main Menu")
 
@@ -60,7 +77,7 @@ func findContact() {
 		choice := scanner.Text()
 
 		if choice == "m" {
-			mainMenu()
+			break
 		} else {
 			i, err := strconv.Atoi(choice)
 			if err != nil {
@@ -75,31 +92,33 @@ func findContact() {
 func editContact(c *contact) {
 	scanner := bufio.NewScanner(os.Stdin)
 
-	fmt.Printf("First name [%s]: ", c.firstName)
+	fmt.Printf("First name [%s]: ", c.FirstName)
 	scanner.Scan()
 	firstName := scanner.Text()
-	if firstName != "" && firstName != c.firstName {
-		c.firstName = firstName
+	if firstName != "" && firstName != c.FirstName {
+		c.FirstName = firstName
 	}
 
-	fmt.Printf("Last name [%s]: ", c.lastName)
+	fmt.Printf("Last name [%s]: ", c.LastName)
 	scanner.Scan()
 	lastName := scanner.Text()
-	if lastName != "" && lastName != c.lastName {
-		c.lastName = lastName
+	if lastName != "" && lastName != c.LastName {
+		c.LastName = lastName
 	}
 
+	// Executes in a loop until the user enters a number
+	// or just hits enter, which indicates no change
 	for {
-		fmt.Printf("Age [%d]: ", c.age)
+		fmt.Printf("Age [%d]: ", c.Age)
 		scanner.Scan()
 		age := scanner.Text()
-		if age != "" && age != strconv.Itoa(c.age) {
+		if age != "" && age != strconv.Itoa(c.Age) {
 			ageNum, err := strconv.Atoi(age)
 			if err != nil {
 				fmt.Println("Invalid age.")
 				continue
 			} else {
-				c.age = ageNum
+				c.Age = ageNum
 				break
 			}
 		} else {
@@ -107,14 +126,14 @@ func editContact(c *contact) {
 		}
 	}
 
-	fmt.Printf("Telephone [%s]: ", c.telephone)
+	fmt.Printf("Telephone [%s]: ", c.Telephone)
 	scanner.Scan()
 	telephone := scanner.Text()
-	if telephone != "" && telephone != c.telephone {
-		c.telephone = telephone
+	if telephone != "" && telephone != c.Telephone {
+		c.Telephone = telephone
 	}
 
-	fmt.Println("Contact saved.")
+	save()
 }
 
 func createContact() {
@@ -140,6 +159,11 @@ func createContact() {
 	newContact := contact{firstName, lastName, ageNum, telephone}
 	contacts = append(contacts, newContact)
 
-	fmt.Println("Contact saved.")
-	mainMenu()
+	save()
+}
+
+func save() {
+	output, _ := json.Marshal(contacts)
+	ioutil.WriteFile("contacts.json", output, 0644)
+	fmt.Println("Changes saved.")
 }
